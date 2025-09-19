@@ -327,15 +327,17 @@ class PyView:
             # Always include time if available
             for dim in dims:
                 dim_lower = dim.lower()
-                if any(keyword in dim_lower for keyword in ['time', 'tim', 't']):
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'lat']):
+                    continue
+                elif any(keyword in dim_lower for keyword in ['time', 'tim', 't']):
                     navigable.add(dim)
                 elif dim == 'time':
                     navigable.add(dim)
 
             # For Hovmöller, we plot depth vs one spatial dimension
             # We need to exclude BOTH depth AND the plotted spatial dimension
-            has_lat = any('lat' in dim.lower() for dim in dims) or any(dim in ['lat', 'latitude'] for dim in dims)
-            has_lon = any('lon' in dim.lower() for dim in dims) or any(dim in ['lon', 'longitude'] for dim in dims)
+            has_lat = any('lat' in dim.lower() for dim in dims) or any(dim.tolower() in ['lat', 'latitude'] for dim in dims)
+            has_lon = any('lon' in dim.lower() for dim in dims) or any(dim.tolower() in ['lon', 'longitude'] for dim in dims)
 
             if has_lat and has_lon:
                 # Both available - we plot depth vs lat by default, so we can navigate lon
@@ -1203,12 +1205,18 @@ class PyView:
         if self.vars:
             first_var = self.vars[0]
 
-            # Set the variable
-            self.var_selector.value = first_var
+            self.current_var = first_var
+            self.update_plot_type_options(self.current_var)
 
             # Determine and set the best plot type
-            best_plot_type = self.get_best_initial_plot_type(first_var)
+            best_plot_type = self.get_best_initial_plot_type(self.current_var)
             self.plot_type.value = best_plot_type
+
+            self.create_dimension_controls(self.current_var)
+
+            # Update range inputs if in manual mode
+            if not self.auto_range_checkbox.value:
+                self.update_range_inputs_from_data()
 
             # Generate the initial plot
             self.update_plot()
