@@ -235,16 +235,18 @@ class PyView:
         var = self.ds[var_name]
         dims = list(var.dims)
 
-        # Check for required dimensions
-        has_lat = any('lat' in dim.lower() for dim in dims)
-        has_lon = any('lon' in dim.lower() for dim in dims)
-        has_depth = any('dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower() for dim in dims)
-        has_time = any('time' in dim.lower() or 'tim' in dim.lower() for dim in dims)
+        # Check for required dimensions with more flexible matching
+        has_lat = any('lat' in dim.lower() for dim in dims) or any(dim in ['lat', 'latitude'] for dim in dims)
+        has_lon = any('lon' in dim.lower() for dim in dims) or any(dim in ['lon', 'longitude'] for dim in dims)
+        has_depth = any(keyword in dim.lower() for dim in dims for keyword in ['dep', 'depth', 'lev', 'z']) or any(dim in ['depth', 'z', 'level'] for dim in dims)
+        has_time = any(keyword in dim.lower() for dim in dims for keyword in ['time', 'tim']) or 'time' in dims
 
         # Count total spatial/temporal dimensions
         spatial_temporal_dims = 0
         for dim in dims:
-            if any(keyword in dim.lower() for keyword in ['lat', 'lon', 'dep', 'depth', 'lev', 'time', 'tim']):
+            dim_lower = dim.lower()
+            if (any(keyword in dim_lower for keyword in ['lat', 'lon', 'dep', 'depth', 'lev', 'time', 'tim', 'z']) or
+                dim in ['lat', 'lon', 'latitude', 'longitude', 'depth', 'z', 'level', 'time']):
                 spatial_temporal_dims += 1
 
         validation = {
@@ -265,46 +267,100 @@ class PyView:
         dims = set(var.dims)
 
         if plot_type == 'map':
-            # Can navigate: depth, time (but not lat/lon which are plot axes)
+            # Can navigate: depth, time (but NOT lat/lon which are plot axes)
             navigable = set()
             for dim in dims:
-                if any(keyword in dim.lower() for keyword in ['dep', 'depth', 'lev', 'time', 'tim']):
+                dim_lower = dim.lower()
+                # Exclude lat/lon dimensions - they are the plot axes
+                if any(keyword in dim_lower for keyword in ['lat', 'lon']):
+                    continue
+                elif dim in ['lat', 'latitude', 'lon', 'longitude']:
+                    continue
+                # Include depth and time dimensions
+                elif any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']):
+                    navigable.add(dim)
+                elif any(keyword in dim_lower for keyword in ['time', 'tim', 't']):
+                    navigable.add(dim)
+                elif dim in ['time', 'depth', 'z', 'level']:
                     navigable.add(dim)
             return navigable
 
         elif plot_type == 'depth':
-            # Can navigate: lat, lon, time (but not depth which is plot axis)
+            # Can navigate: lat, lon, time (but NOT depth which is plot axis)
             navigable = set()
             for dim in dims:
-                if any(keyword in dim.lower() for keyword in ['lat', 'lon', 'time', 'tim']):
+                dim_lower = dim.lower()
+                # Exclude depth dimensions - they are the plot axis
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']):
+                    continue
+                elif dim in ['depth', 'z', 'level']:
+                    continue
+                # Include lat, lon, time dimensions
+                elif any(keyword in dim_lower for keyword in ['lat', 'lon', 'time', 'tim', 't']):
+                    navigable.add(dim)
+                elif dim in ['time', 'lat', 'lon', 'latitude', 'longitude']:
                     navigable.add(dim)
             return navigable
 
         elif plot_type == 'time':
-            # Can navigate: lat, lon, depth (but not time which is plot axis)
+            # Can navigate: lat, lon, depth (but NOT time which is plot axis)
             navigable = set()
             for dim in dims:
-                if any(keyword in dim.lower() for keyword in ['lat', 'lon', 'dep', 'depth', 'lev']):
+                dim_lower = dim.lower()
+                # Exclude time dimensions - they are the plot axis
+                if any(keyword in dim_lower for keyword in ['time', 'tim']):
+                    continue
+                elif dim == 'time':
+                    continue
+                # Include lat, lon, depth dimensions
+                elif any(keyword in dim_lower for keyword in ['lat', 'lon', 'dep', 'depth', 'lev', 'z']):
+                    navigable.add(dim)
+                elif dim in ['depth', 'z', 'level', 'lat', 'lon', 'latitude', 'longitude']:
                     navigable.add(dim)
             return navigable
 
         elif plot_type == 'hovmoller':
-            # Can navigate: one spatial dimension, time (depth and one spatial are plot axes)
+            # Can navigate: time and the NON-PLOTTED spatial dimension
+            # (depth and one spatial dimension are plot axes)
             navigable = set()
+
+            # Always include time if available
             for dim in dims:
-                if any(keyword in dim.lower() for keyword in ['time', 'tim']):
+                dim_lower = dim.lower()
+                if any(keyword in dim_lower for keyword in ['time', 'tim', 't']):
                     navigable.add(dim)
-            # Add the spatial dimension not used in the plot
-            has_lat = any('lat' in dim.lower() for dim in dims)
-            has_lon = any('lon' in dim.lower() for dim in dims)
+                elif dim == 'time':
+                    navigable.add(dim)
+
+            # For Hovmöller, we plot depth vs one spatial dimension
+            # We need to exclude BOTH depth AND the plotted spatial dimension
+            has_lat = any('lat' in dim.lower() for dim in dims) or any(dim in ['lat', 'latitude'] for dim in dims)
+            has_lon = any('lon' in dim.lower() for dim in dims) or any(dim in ['lon', 'longitude'] for dim in dims)
+
             if has_lat and has_lon:
-                # Both available - user can navigate one while other is plotted
+                # Both available - we plot depth vs lat by default, so we can navigate lon
+                # Exclude depth (plot axis) and lat (plot axis), include lon (navigable)
                 for dim in dims:
-                    if 'lon' in dim.lower():  # Default to navigating lon, plotting lat
+                    dim_lower = dim.lower()
+                    # Exclude depth - it's a plot axis
+                    if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']):
+                        continue
+                    elif dim in ['depth', 'z', 'level']:
+                        continue
+                    # Exclude lat - it's the plotted spatial dimension
+                    elif any(keyword in dim_lower for keyword in ['lat']):
+                        continue
+                    elif dim in ['lat', 'latitude']:
+                        continue
+                    # Include lon - it's navigable
+                    elif any(keyword in dim_lower for keyword in ['lon']):
                         navigable.add(dim)
+                    elif dim in ['lon', 'longitude']:
+                        navigable.add(dim)
+
             return navigable
 
-        return dims  # Default: all dimensions navigable
+        return set()
 
     def setup_interface(self):
         """Setup the ncview-style interface"""
@@ -426,7 +482,7 @@ class PyView:
         self.nav_controls = widgets.HBox(
             layout=widgets.Layout(
                 justify_content='flex-start',
-                width='320px',  # Match width of left Variable&View panel
+                width='720px',  # Match width of left Variable&View panel
                 margin='0'
             )
         )
@@ -682,6 +738,7 @@ class PyView:
         if plot_type == 'map' and len(dims) >= 2:
             # For maps, set to surface/first level
             for dim in dims:
+                print(dim)
                 if 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower() or 'z_' in dim.lower():
                     if dim in self.dim_indices:
                         self.dim_indices[dim] = 0  # Surface
@@ -724,7 +781,7 @@ class PyView:
                         self.dim_indices[dim] = mid_idx
                         self.update_index_display(dim)
                         self.update_coord_display(dim, mid_idx)
-                elif 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower():
+                elif 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower() or 'z_' in dim.lower():
                     if dim in self.dim_indices:
                         self.dim_indices[dim] = 0  # Surface level
                         self.update_index_display(dim)
@@ -762,9 +819,10 @@ class PyView:
             # Geographic map: lat x lon
             plot_dims = []
             for dim in var.dims:
-                if 'lat' in dim.lower():
+                dim_lower = dim.lower()
+                if any(keyword in dim_lower for keyword in ['lat']) or dim in ['lat', 'latitude']:
                     plot_dims.append(dim)
-                elif 'lon' in dim.lower():
+                elif any(keyword in dim_lower for keyword in ['lon']) or dim in ['lon', 'longitude']:
                     plot_dims.append(dim)
 
             if len(plot_dims) == 2:
@@ -777,14 +835,16 @@ class PyView:
                 return data_slice, plot_dims, slice_dict_copy
 
         elif plot_type == 'depth':
-            # Depth profile: depth x variable
+            # Depth profile: depth vs variable value
             depth_dim = None
             for dim in var.dims:
-                if 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower():
+                dim_lower = dim.lower()
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']) or dim in ['depth', 'z', 'level']:
                     depth_dim = dim
                     break
 
             if depth_dim:
+                # Remove depth dimension from slice (it's the plot axis)
                 slice_dict_copy = slice_dict.copy()
                 slice_dict_copy.pop(depth_dim, None)
 
@@ -792,14 +852,16 @@ class PyView:
                 return data_slice, [depth_dim], slice_dict_copy
 
         elif plot_type == 'time':
-            # Time series: time x variable
+            # Time series: time vs variable value
             time_dim = None
             for dim in var.dims:
-                if 'time' in dim.lower() or 'tim' in dim.lower():
+                dim_lower = dim.lower()
+                if any(keyword in dim_lower for keyword in ['time', 'tim', 't']) or dim == 'time':
                     time_dim = dim
                     break
 
             if time_dim:
+                # Remove time dimension from slice (it's the plot axis)
                 slice_dict_copy = slice_dict.copy()
                 slice_dict_copy.pop(time_dim, None)
 
@@ -807,35 +869,40 @@ class PyView:
                 return data_slice, [time_dim], slice_dict_copy
 
         elif plot_type == 'hovmoller':
-            # Hovmöller diagram: depth x lat or depth x lon
+            # Hovmöller: depth vs spatial dimension
             depth_dim = None
             spatial_dim = None
 
             # Find depth dimension
             for dim in var.dims:
-                if 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower():
+                dim_lower = dim.lower()
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']) or dim in ['depth', 'z', 'level']:
                     depth_dim = dim
                     break
 
-            # Find a spatial dimension (prefer lat, then lon)
+            # Find spatial dimension to plot (prefer lat)
             for dim in var.dims:
-                if 'lat' in dim.lower():
+                dim_lower = dim.lower()
+                if any(keyword in dim_lower for keyword in ['lat']) or dim in ['lat', 'latitude']:
                     spatial_dim = dim
                     break
+
+            # If no lat, try lon
             if not spatial_dim:
                 for dim in var.dims:
-                    if 'lon' in dim.lower():
+                    dim_lower = dim.lower()
+                    if any(keyword in dim_lower for keyword in ['lon']) or dim in ['lon', 'longitude']:
                         spatial_dim = dim
                         break
 
             if depth_dim and spatial_dim:
-                plot_dims = [depth_dim, spatial_dim]
+                # Remove depth and spatial dimensions from slice (they're the plot axes)
                 slice_dict_copy = slice_dict.copy()
-                for dim in plot_dims:
-                    slice_dict_copy.pop(dim, None)
+                slice_dict_copy.pop(depth_dim, None)
+                slice_dict_copy.pop(spatial_dim, None)
 
                 data_slice = var.isel(slice_dict_copy)
-                return data_slice, plot_dims, slice_dict_copy
+                return data_slice, [depth_dim, spatial_dim], slice_dict_copy
 
         return None, None, {}
 
