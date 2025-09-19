@@ -1,0 +1,39 @@
+name: pyview
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python
+  - python>=3.8
+
+  # Core scientific computing
+  - numpy>=1.20.0
+  - xarray>=0.20.0
+  - matplotlib>=3.5.0
+  - pandas>=1.3.0
+
+  # NetCDF and data format support
+  - netcdf4>=1.5.0
+  - h5netcdf>=0.14.0
+  - zarr>=2.10.0
+
+  # Jupyter and interactive widgets
+  - jupyter
+  - jupyterlab>=3.0
+  - ipywidgets>=7.6.0
+  - nodejs>=14  # Required for JupyterLab widget extensions
+
+  # Optional but useful for scientific computing
+  - scipy
+  - dask
+  - bottleneck  # For faster xarray operations
+
+  # Development and quality of life
+  - black  # Code formatting
+  - pytest  # Testing
+  - pip
+
+  # Install remaining packages via pip
+  - pip:
+    - jupyterlab-widgets  # Ensure widget compatibility
+    - ipywidgets[all]  # Full widget support
