@@ -682,7 +682,7 @@ class PyView:
         if plot_type == 'map' and len(dims) >= 2:
             # For maps, set to surface/first level
             for dim in dims:
-                if 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower():
+                if 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower() or 'z_' in dim.lower():
                     if dim in self.dim_indices:
                         self.dim_indices[dim] = 0  # Surface
                         self.update_index_display(dim)
