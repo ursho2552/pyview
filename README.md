@@ -352,8 +352,7 @@ MIT License - Open source and free for all scientific use.
 
 ## Author
 
-Urs Hofmann Elizondo
-Date: 19/09/2025
+Urs Hofmann Elizondo, 19/09/2025
 
 ## Acknowledgments
 
