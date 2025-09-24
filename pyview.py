@@ -236,9 +236,9 @@ class PyView:
         dims = list(var.dims)
 
         # Check for required dimensions with more flexible matching
-        has_lat = any('lat' in dim.lower() for dim in dims) or any(dim in ['lat', 'latitude'] for dim in dims)
-        has_lon = any('lon' in dim.lower() for dim in dims) or any(dim in ['lon', 'longitude'] for dim in dims)
-        has_depth = any(keyword in dim.lower() for dim in dims for keyword in ['dep', 'depth', 'lev', 'z']) or any(dim in ['depth', 'z', 'level'] for dim in dims)
+        has_lat = any('lat' in dim.lower() for dim in dims) or any(dim in ['lat', 'latitude', 'yt_ocean', 'yu_ocean'] for dim in dims)
+        has_lon = any('lon' in dim.lower() for dim in dims) or any(dim in ['lon', 'longitude', 'xt_ocean', 'xu_ocean'] for dim in dims)
+        has_depth = any(keyword in dim.lower() for dim in dims for keyword in ['dep', 'depth', 'lev', 'z']) or any(dim in ['depth', 'z', 'level', 'st_ocean', 'sw_ocean'] for dim in dims)
         has_time = any(keyword in dim.lower() for dim in dims for keyword in ['time', 'tim']) or 'time' in dims
 
         # Count total spatial/temporal dimensions
@@ -246,7 +246,7 @@ class PyView:
         for dim in dims:
             dim_lower = dim.lower()
             if (any(keyword in dim_lower for keyword in ['lat', 'lon', 'dep', 'depth', 'lev', 'time', 'tim', 'z']) or
-                dim in ['lat', 'lon', 'latitude', 'longitude', 'depth', 'z', 'level', 'time']):
+                dim in ['lat', 'lon', 'latitude', 'longitude', 'depth', 'z', 'level', 'time', 'st_ocean', 'sw_ocean', 'xt_ocean', 'yt_ocean', 'xu_ocean', 'yu_ocean']):
                 spatial_temporal_dims += 1
 
         validation = {
@@ -274,10 +274,10 @@ class PyView:
                 # Exclude lat/lon dimensions - they are the plot axes
                 if any(keyword in dim_lower for keyword in ['lat', 'lon']):
                     continue
-                elif dim in ['lat', 'latitude', 'lon', 'longitude']:
+                elif dim in ['lat', 'latitude', 'lon', 'longitude', 'xt_ocean', 'yt_ocean', 'xu_ocean', 'yu_ocean']:
                     continue
                 # Include depth and time dimensions
-                elif any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']):
+                elif any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'st', 'sw']):
                     navigable.add(dim)
                 elif any(keyword in dim_lower for keyword in ['time', 'tim', 't']):
                     navigable.add(dim)
@@ -291,14 +291,14 @@ class PyView:
             for dim in dims:
                 dim_lower = dim.lower()
                 # Exclude depth dimensions - they are the plot axis
-                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']):
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'st', 'sw']):
                     continue
                 elif dim in ['depth', 'z', 'level']:
                     continue
                 # Include lat, lon, time dimensions
                 elif any(keyword in dim_lower for keyword in ['lat', 'lon', 'time', 'tim', 't']):
                     navigable.add(dim)
-                elif dim in ['time', 'lat', 'lon', 'latitude', 'longitude']:
+                elif dim in ['time', 'lat', 'lon', 'latitude', 'longitude', 'xt_ocean', 'yt_ocean', 'xu_ocean', 'yu_ocean']:
                     navigable.add(dim)
             return navigable
 
@@ -313,9 +313,9 @@ class PyView:
                 elif dim == 'time':
                     continue
                 # Include lat, lon, depth dimensions
-                elif any(keyword in dim_lower for keyword in ['lat', 'lon', 'dep', 'depth', 'lev', 'z']):
+                elif any(keyword in dim_lower for keyword in ['lat', 'lon', 'dep', 'depth', 'lev', 'z', 'st', 'sw']):
                     navigable.add(dim)
-                elif dim in ['depth', 'z', 'level', 'lat', 'lon', 'latitude', 'longitude']:
+                elif dim in ['depth', 'z', 'level', 'lat', 'lon', 'latitude', 'longitude', 'xt_ocean', 'yt_ocean', 'xu_ocean', 'yu_ocean']:
                     navigable.add(dim)
             return navigable
 
@@ -327,7 +327,7 @@ class PyView:
             # Always include time if available
             for dim in dims:
                 dim_lower = dim.lower()
-                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'lat']):
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'lat', 'st', 'sw', 'yt', 'yu']):
                     continue
                 elif any(keyword in dim_lower for keyword in ['time', 'tim', 't']):
                     navigable.add(dim)
@@ -336,8 +336,10 @@ class PyView:
 
             # For Hovmöller, we plot depth vs one spatial dimension
             # We need to exclude BOTH depth AND the plotted spatial dimension
-            has_lat = any('lat' in dim.lower() for dim in dims) or any(dim.tolower() in ['lat', 'latitude'] for dim in dims)
-            has_lon = any('lon' in dim.lower() for dim in dims) or any(dim.tolower() in ['lon', 'longitude'] for dim in dims)
+            has_lat = any(keyword in dim.lower() for dim in dims for keyword in ['lat', 'latitude', 'yt', 'yu'])
+            has_lon = any(keyword in dim.lower() for dim in dims for keyword in ['lon', 'longitude', 'xt', 'xu'])
+            #has_lat = any('lat' in dim.lower() for dim in dims) or any(dim.lower() in ['lat', 'latitude'] for dim in dims)
+            #has_lon = any('lon' in dim.lower() for dim in dims) or any(dim.lower() in ['lon', 'longitude'] for dim in dims)
 
             if has_lat and has_lon:
                 # Both available - we plot depth vs lat by default, so we can navigate lon
@@ -345,17 +347,17 @@ class PyView:
                 for dim in dims:
                     dim_lower = dim.lower()
                     # Exclude depth - it's a plot axis
-                    if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']):
+                    if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'st', 'sw']):
                         continue
                     elif dim in ['depth', 'z', 'level']:
                         continue
                     # Exclude lat - it's the plotted spatial dimension
-                    elif any(keyword in dim_lower for keyword in ['lat']):
+                    elif any(keyword in dim_lower for keyword in ['lat', 'latitude', 'yt', 'yu']):
                         continue
                     elif dim in ['lat', 'latitude']:
                         continue
                     # Include lon - it's navigable
-                    elif any(keyword in dim_lower for keyword in ['lon']):
+                    elif any(keyword in dim_lower for keyword in ['lon', 'longitude', 'xt', 'xu']):
                         navigable.add(dim)
                     elif dim in ['lon', 'longitude']:
                         navigable.add(dim)
@@ -740,8 +742,7 @@ class PyView:
         if plot_type == 'map' and len(dims) >= 2:
             # For maps, set to surface/first level
             for dim in dims:
-                print(dim)
-                if 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower() or 'z_' in dim.lower():
+                if any(keyword in dim.lower() for keyword in ['dep', 'depth', 'lev', 'z_', 'st', 'sw']):
                     if dim in self.dim_indices:
                         self.dim_indices[dim] = 0  # Surface
                         self.update_index_display(dim)
@@ -755,13 +756,13 @@ class PyView:
         elif plot_type == 'depth':
             # For depth profiles, set to specific location
             for dim in dims:
-                if 'lat' in dim.lower():
+                if any(keyword in dim.lower() for keyword in ['lat', 'yt', 'yu']):
                     if dim in self.dim_indices:
                         mid_idx = len(self.ds.coords[dim]) // 2
                         self.dim_indices[dim] = mid_idx
                         self.update_index_display(dim)
                         self.update_coord_display(dim, mid_idx)
-                elif 'lon' in dim.lower():
+                elif any(keyword in dim.lower() for keyword in ['lon', 'xt', 'xu']):
                     if dim in self.dim_indices:
                         mid_idx = len(self.ds.coords[dim]) // 2
                         self.dim_indices[dim] = mid_idx
@@ -771,19 +772,19 @@ class PyView:
         elif plot_type == 'time':
             # For time series, set to specific location and depth
             for dim in dims:
-                if 'lat' in dim.lower():
+                if any(keyword in dim.lower() for keyword in ['lat', 'yt', 'yu']):
                     if dim in self.dim_indices:
                         mid_idx = len(self.ds.coords[dim]) // 2
                         self.dim_indices[dim] = mid_idx
                         self.update_index_display(dim)
                         self.update_coord_display(dim, mid_idx)
-                elif 'lon' in dim.lower():
+                elif any(keyword in dim.lower() for keyword in ['lon', 'xt', 'xu']):
                     if dim in self.dim_indices:
                         mid_idx = len(self.ds.coords[dim]) // 2
                         self.dim_indices[dim] = mid_idx
                         self.update_index_display(dim)
                         self.update_coord_display(dim, mid_idx)
-                elif 'dep' in dim.lower() or 'depth' in dim.lower() or 'lev' in dim.lower() or 'z_' in dim.lower():
+                elif any(keyword in dim.lower() for keyword in ['dep', 'depth', 'lev', 'z_', 'st', 'sw']):
                     if dim in self.dim_indices:
                         self.dim_indices[dim] = 0  # Surface level
                         self.update_index_display(dim)
@@ -822,9 +823,9 @@ class PyView:
             plot_dims = []
             for dim in var.dims:
                 dim_lower = dim.lower()
-                if any(keyword in dim_lower for keyword in ['lat']) or dim in ['lat', 'latitude']:
+                if any(keyword in dim_lower for keyword in ['lat', 'yt', 'yu']) or dim in ['lat', 'latitude']:
                     plot_dims.append(dim)
-                elif any(keyword in dim_lower for keyword in ['lon']) or dim in ['lon', 'longitude']:
+                elif any(keyword in dim_lower for keyword in ['lon', 'xt', 'xu']) or dim in ['lon', 'longitude']:
                     plot_dims.append(dim)
 
             if len(plot_dims) == 2:
@@ -841,7 +842,7 @@ class PyView:
             depth_dim = None
             for dim in var.dims:
                 dim_lower = dim.lower()
-                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']) or dim in ['depth', 'z', 'level']:
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'st', 'sw']) or dim in ['depth', 'z', 'level']:
                     depth_dim = dim
                     break
 
@@ -878,14 +879,14 @@ class PyView:
             # Find depth dimension
             for dim in var.dims:
                 dim_lower = dim.lower()
-                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z']) or dim in ['depth', 'z', 'level']:
+                if any(keyword in dim_lower for keyword in ['dep', 'depth', 'lev', 'z', 'st', 'sw']):
                     depth_dim = dim
                     break
 
             # Find spatial dimension to plot (prefer lat)
             for dim in var.dims:
                 dim_lower = dim.lower()
-                if any(keyword in dim_lower for keyword in ['lat']) or dim in ['lat', 'latitude']:
+                if any(keyword in dim_lower for keyword in ['lat', 'yt', 'yu']):
                     spatial_dim = dim
                     break
 
@@ -893,7 +894,7 @@ class PyView:
             if not spatial_dim:
                 for dim in var.dims:
                     dim_lower = dim.lower()
-                    if any(keyword in dim_lower for keyword in ['lon']) or dim in ['lon', 'longitude']:
+                    if any(keyword in dim_lower for keyword in ['lon', 'xt', 'xu']):
                         spatial_dim = dim
                         break
 
