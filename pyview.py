@@ -591,9 +591,14 @@ class PyView:
                         layout=widgets.Layout(width='50px', text_align='center')
                     )
 
-                    # Coordinate display
-                    coord_display = widgets.HTML(layout=widgets.Layout(width='100px'))
-                    self.coord_displays[dim] = coord_display
+                    # Coordinate input field
+                    coord_input = widgets.Text(
+                        placeholder="0.0",
+                        layout=widgets.Layout(width='80px', height='25px'),
+                        style={'description_width': '0px'}
+                    )
+                    coord_input.on_submit(lambda widget, d=dim: self.on_coord_input_submit(widget, d))
+                    self.coord_displays[dim] = coord_input
                     self.update_coord_display(dim, 0)
 
                     # Compact navigation group
@@ -601,14 +606,19 @@ class PyView:
                         widgets.HTML(f"<small><b>{dim}</b></small>"),
                         widgets.HBox([prev_btn, index_display, next_btn],
                                     layout=widgets.Layout(justify_content='center')),
-                        coord_display
-                    ], layout=widgets.Layout(align_items='center', margin='0 15px', width='120px'))
+                        coord_input
+                    ], layout=widgets.Layout(align_items='center', margin='0 5px', width='250px', height='120px', padding='1px'))
 
                     nav_controls.append(nav_group)
                 else:
-                    # For non-navigable dimensions, still set up coord display but no buttons
-                    coord_display = widgets.HTML(layout=widgets.Layout(width='100px'))
-                    self.coord_displays[dim] = coord_display
+                    # For non-navigable dimensions, still set up coord display but no input interaction
+                    coord_input = widgets.Text(
+                        placeholder="0.0",
+                        layout=widgets.Layout(width='80px', height='25px'),
+                        disabled=True,  # Non-navigable dimensions are read-only
+                        style={'description_width': '0px'}
+                    )
+                    self.coord_displays[dim] = coord_input
                     self.update_coord_display(dim, 0)
 
         # Update left panel dimension info
@@ -708,18 +718,67 @@ class PyView:
                     break
 
     def update_coord_display(self, dim, index):
-        """Update coordinate display"""
+        """Update coordinate input field"""
         try:
             if dim in self.ds.coords:
                 coord_val = self.ds.coords[dim].values[index]
                 if isinstance(coord_val, (int, float, np.number)):
-                    self.coord_displays[dim].value = f"<small>{coord_val:.2f}</small>"
+                    self.coord_displays[dim].value = f"{coord_val:.2f}"
                 else:
-                    self.coord_displays[dim].value = f"<small>{coord_val}</small>"
+                    self.coord_displays[dim].value = str(coord_val)
             else:
-                self.coord_displays[dim].value = f"<small>idx {index}</small>"
+                self.coord_displays[dim].value = str(index)
         except:
-            self.coord_displays[dim].value = f"<small>idx {index}</small>"
+            self.coord_displays[dim].value = str(index)
+
+    def on_coord_input_submit(self, widget, dim):
+        """Handle coordinate input field submission (Enter key)"""
+        try:
+            user_input = widget.value.strip()
+            if not user_input:
+                return
+
+            if dim in self.ds.coords:
+                # Try to find the closest coordinate value
+                coord_values = self.ds.coords[dim].values
+
+                try:
+                    target_value = float(user_input)
+                    # Find closest index
+                    if isinstance(coord_values[0], (int, float, np.number)):
+                        distances = np.abs(coord_values - target_value)
+                        closest_index = int(np.argmin(distances))
+                    else:
+                        # Non-numeric coordinates, fallback to index
+                        closest_index = int(target_value) if target_value >= 0 else 0
+                except (ValueError, TypeError):
+                    # If not numeric, try to find exact match
+                    try:
+                        closest_index = list(coord_values).index(user_input)
+                    except ValueError:
+                        return  # Invalid input, ignore
+            else:
+                # Dimension without coordinates, treat as index
+                try:
+                    closest_index = int(float(user_input))
+                except (ValueError, TypeError):
+                    return  # Invalid input, ignore
+
+            # Validate index bounds
+            dim_size = self.ds.dims[dim]
+            closest_index = max(0, min(closest_index, dim_size - 1))
+
+            # Update the dimension index and UI
+            if dim in self.dim_indices:
+                self.dim_indices[dim] = closest_index
+                self.update_index_display(dim)
+                self.update_coord_display(dim, closest_index)
+                self.update_plot()
+
+        except Exception:
+            # On error, reset to current valid value
+            if dim in self.dim_indices:
+                self.update_coord_display(dim, self.dim_indices[dim])
 
     def on_plot_type_change(self, change):
         """Handle plot type change"""
