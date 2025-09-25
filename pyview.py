@@ -586,8 +586,9 @@ class PyView:
                     self.nav_buttons[dim] = {'prev': prev_btn, 'next': next_btn}
 
                     # Current index display
+                    current_idx = self.dim_indices[dim]
                     index_display = widgets.HTML(
-                        value=f"<small><b>1/{size}</b></small>",
+                        value=f"<small><b>{current_idx + 1}/{size}</b></small>",
                         layout=widgets.Layout(width='50px', text_align='center')
                     )
 
@@ -599,7 +600,7 @@ class PyView:
                     )
                     coord_input.on_submit(lambda widget, d=dim: self.on_coord_input_submit(widget, d))
                     self.coord_displays[dim] = coord_input
-                    self.update_coord_display(dim, 0)
+                    self.update_coord_display(dim, current_idx)
 
                     # Compact navigation group
                     nav_group = widgets.VBox([
@@ -612,6 +613,7 @@ class PyView:
                     nav_controls.append(nav_group)
                 else:
                     # For non-navigable dimensions, still set up coord display but no input interaction
+                    current_idx = self.dim_indices[dim]
                     coord_input = widgets.Text(
                         placeholder="0.0",
                         layout=widgets.Layout(width='80px', height='25px'),
@@ -619,7 +621,7 @@ class PyView:
                         style={'description_width': '0px'}
                     )
                     self.coord_displays[dim] = coord_input
-                    self.update_coord_display(dim, 0)
+                    self.update_coord_display(dim, current_idx)
 
         # Update left panel dimension info
         self.dim_controls.children = controls
