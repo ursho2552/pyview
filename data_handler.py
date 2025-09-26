@@ -5,8 +5,8 @@ import xarray as xr
 DIMENSION_KEYWORDS = {
     'lat': ['lat', 'yt', 'yu', 'y', 'latitude'],
     'lon': ['lon', 'xt', 'xu', 'x', 'longitude'],
-    'depth': ['dep', 'lev', 'z', 'st', 'sw', 'depth', 'level'],
-    'time': ['tim', 'time']
+    'depth': ['dep', 'lev', 'z', 'st', 'sw', 'depth', 'level', 'sigma', 's_'],
+    'time': ['tim', 'time', 'ocean_time', 'time_counter', 'year', 'month', 'day']
 }
 
 class DataHandler:

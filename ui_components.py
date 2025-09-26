@@ -32,10 +32,7 @@ class UIComponents:
         self.coord_displays: dict[str, widgets.Text] = {}
         self.nav_buttons: dict[str, dict[str, widgets.Button]] = {}
 
-        # Storage for widgets
-        self.sliders: dict[str, widgets.Widget] = {}
-
-        # Widget attributes (set in setup_interface)
+        # Widget attributes
         self.var_selector: widgets.Dropdown
         self.plot_type: widgets.RadioButtons
         self.cmap_selector: widgets.Dropdown
@@ -161,13 +158,9 @@ class UIComponents:
             self.plot_widget
         ], layout=widgets.Layout(padding='10px'))
 
-        # Navigation controls container - match width of left Variable&View panel
+        # Navigation controls container
         self.nav_controls = widgets.HBox(
-            layout=widgets.Layout(
-                justify_content='flex-start',
-                width='720px',  # Match width of left Variable&View panel...
-                margin='0'
-            )
+            layout=widgets.Layout(width='720px')
         )
 
         # Current coordinates display
@@ -239,7 +232,7 @@ class UIComponents:
 
         # Get current plot type and determine navigable dimensions
         current_plot_type = self.plot_type.value
-        navigable_dims = self.get_navigable_dimensions_for_plot_type(var_name, current_plot_type)
+        navigable_dims = self.data_handler.get_navigable_dimensions_for_plot_type(var_name, current_plot_type)
 
         for dim in var.dims:
             size = var.sizes[dim]
@@ -323,55 +316,6 @@ class UIComponents:
 
         # Update bottom navigation panel (only navigable dimensions)
         self.nav_controls.children = nav_controls
-
-    def get_dimension_names(self, dim_mapping: Optional[dict[str, str]] = None) -> dict[str, Optional[str]]:
-        """
-        Delegate to data_handler
-
-        Parameters:
-        dim_mapping (dict, optional): Custom dimension mapping
-
-        Returns:
-        dict: Dimension names
-        """
-        return self.data_handler.get_dimension_names(dim_mapping)
-
-    def get_dimension_name(self, dim_type: str) -> Optional[str]:
-        """
-        Delegate to data_handler
-
-        Parameters:
-        dim_type (str): One of 'lat', 'lon', 'depth', 'time'
-
-        Returns:
-        str: Dimension name or None
-        """
-        return self.data_handler.get_dimension_name(dim_type)
-
-    def validate_plot_types_for_variable(self, var_name: str) -> dict[str, bool]:
-        """
-        Delegate to data_handler
-
-        Parameters:
-        var_name (str): Variable name to validate
-
-        Returns:
-        dict: Availability of plot types
-        """
-        return self.data_handler.validate_plot_types_for_variable(var_name)
-
-    def get_navigable_dimensions_for_plot_type(self, var_name: str, plot_type: str) -> set[str]:
-        """
-        Delegate to data_handler
-
-        Parameters:
-        var_name (str): Variable name
-        plot_type (str): One of 'map', 'depth', 'time', 'hovmoller'
-
-        Returns:
-        set: Set of dimension names that should be navigable
-        """
-        return self.data_handler.get_navigable_dimensions_for_plot_type(var_name, plot_type)
 
     def get_plot_data(self) -> tuple[Optional[xr.DataArray], Optional[list[str]], dict[str, int]]:
         """
@@ -822,21 +766,16 @@ class UIComponents:
                 # Try to find the closest coordinate value
                 coord_values = self.data_handler.ds.coords[dim].values
 
-                try:
-                    target_value = float(user_input)
-                    # Find closest index
-                    if isinstance(coord_values[0], (int, float, np.number)):
-                        distances = np.abs(coord_values - target_value)
-                        closest_index = int(np.argmin(distances))
-                    else:
-                        # Non-numeric coordinates, fallback to index
-                        closest_index = int(target_value) if target_value >= 0 else 0
-                except (ValueError, TypeError):
-                    # If not numeric, try to find exact match
-                    try:
-                        closest_index = list(coord_values).index(user_input)
-                    except ValueError:
-                        return  # Invalid input, ignore
+
+                target_value = float(user_input)
+                # Find closest index
+                if isinstance(coord_values[0], (int, float, np.number)):
+                    distances = np.abs(coord_values - target_value)
+                    closest_index = int(np.argmin(distances))
+                else:
+                    # Non-numeric coordinates, fallback to index
+                    closest_index = int(target_value) if target_value >= 0 else 0
+
             else:
                 # Dimension without coordinates, treat as index
                 try:
@@ -861,97 +800,14 @@ class UIComponents:
                 self.update_coord_display(dim, self.dim_indices[dim])
 
     def on_plot_type_change(self, change: dict[str, Any]) -> None:
-        """
-        Handle plot type change
-
-        Parameters:
-        change (dict): Change event from widget observer
-
-        Returns:
-        None
-        """
+        """Handle plot type change - simplified version"""
         plot_type = change['new']
 
-        # Skip disabled options
-        if plot_type.endswith('_disabled'):
+        if plot_type.endswith('_disabled') or not self.current_var:
             return
 
-        if not self.current_var:
-            return
-
-        # Recreate dimension controls with new navigation validation
+        # Recreate controls for current variable
         self.create_dimension_controls(self.current_var)
-
-        var = self.data_handler.ds[self.current_var]
-        dims = list(var.dims)
-
-        # Get dimension names using centralized approach
-        depth_dim = self.get_dimension_name('depth')
-        time_dim = self.get_dimension_name('time')
-        lat_dim = self.get_dimension_name('lat')
-        lon_dim = self.get_dimension_name('lon')
-
-        # Auto-configure navigation based on plot type
-        if plot_type == 'map' and len(dims) >= 2:
-            # For maps, set to surface/first level
-            for dim in dims:
-                if dim == depth_dim:
-                    if dim in self.dim_indices:
-                        self.dim_indices[dim] = 0  # Surface
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, 0)
-                elif dim == time_dim:
-                    if dim in self.dim_indices:
-                        self.dim_indices[dim] = 0  # First time
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, 0)
-
-        elif plot_type == 'depth':
-            # For depth profiles, set to specific location
-            for dim in dims:
-                if dim == lat_dim:
-                    if dim in self.dim_indices:
-                        mid_idx = len(self.data_handler.ds.coords[dim]) // 2
-                        self.dim_indices[dim] = mid_idx
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, mid_idx)
-                elif dim == lon_dim:
-                    if dim in self.dim_indices:
-                        mid_idx = len(self.data_handler.ds.coords[dim]) // 2
-                        self.dim_indices[dim] = mid_idx
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, mid_idx)
-
-        elif plot_type == 'time':
-            # For time series, set to specific location and depth
-            for dim in dims:
-                if dim == lat_dim:
-                    if dim in self.dim_indices:
-                        mid_idx = len(self.data_handler.ds.coords[dim]) // 2
-                        self.dim_indices[dim] = mid_idx
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, mid_idx)
-                elif dim == lon_dim:
-                    if dim in self.dim_indices:
-                        mid_idx = len(self.data_handler.ds.coords[dim]) // 2
-                        self.dim_indices[dim] = mid_idx
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, mid_idx)
-                elif dim == depth_dim:
-                    if dim in self.dim_indices:
-                        self.dim_indices[dim] = 0  # Surface level
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, 0)
-
-        elif plot_type == 'hovmoller':
-            # For Hovmöller, set time/other dims to first
-            for dim in dims:
-                if dim == time_dim:
-                    if dim in self.dim_indices:
-                        self.dim_indices[dim] = 0
-                        self.update_index_display(dim)
-                        self.update_coord_display(dim, 0)
-
         self.update_plot()
 
     def update_stats(self, values: np.ndarray) -> None:
@@ -964,20 +820,17 @@ class UIComponents:
         Returns:
         None
         """
+
         if values.size > 0:
             flat_vals = values.flatten()
             valid_vals = flat_vals[~np.isnan(flat_vals)]
             if len(valid_vals) > 0:
-                stats_text = f"""<b>Statistics:</b>
-                Min: {np.min(valid_vals):.3g} |
-                Max: {np.max(valid_vals):.3g} |
-                Mean: {np.mean(valid_vals):.3g} |
-                Valid: {len(valid_vals)}/{len(flat_vals)}"""
-                self.stats_display.value = stats_text
+                vmin, vmax, vmean = np.min(valid_vals), np.max(valid_vals), np.mean(valid_vals)
+                self.stats_display.value = f"<b>Stats:</b> {vmin:.2f} to {vmax:.2f} (avg: {vmean:.2f}, n={len(valid_vals)})"
             else:
-                self.stats_display.value = "<b>Statistics:</b> No valid data"
+                self.stats_display.value = "<b>Stats:</b> No valid data"
         else:
-            self.stats_display.value = "<b>Statistics:</b> No data"
+            self.stats_display.value = "<b>Stats:</b> No data"
 
     def update_coord_status(self, slice_dict: Optional[dict[str, int]]) -> None:
         """
@@ -1020,7 +873,7 @@ class UIComponents:
         if not var_name:
             return
 
-        validation = self.validate_plot_types_for_variable(var_name)
+        validation = self.data_handler.validate_plot_types_for_variable(var_name)
 
         # Create new options with validation info
         new_options = []
@@ -1090,7 +943,7 @@ class UIComponents:
             return 'map'
 
         # Get available plot types
-        plot_types = self.validate_plot_types_for_variable(var_name)
+        plot_types = self.data_handler.validate_plot_types_for_variable(var_name)
 
         # Priority: map > time > depth > hovmoller
         plot_type = 'map'
