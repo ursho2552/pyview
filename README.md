@@ -9,7 +9,6 @@ A Python-based interactive netCDF viewer designed for Jupyter notebooks. Provide
 - **Four Plot Types**: Geographic maps, depth profiles, time series, Hovmöller diagrams
 - **Smart Navigation**: Previous/Next buttons with coordinate values and wrap-around
 - **Real-time Statistics**: Automatic min/max/mean updates and valid cells
-- **Theme Support**: Light and dark mode themes
 - **Manual Color Range**: Text-based range inputs for precise control
 - **Smart Validation**: Only shows valid plot types based on data dimensions
 
@@ -52,12 +51,8 @@ jupyter labextension install @jupyter-widgets/jupyterlab-manager
 # Basic usage
 viewer = pyview('your_file.nc')
 
-# With dark theme
-viewer = pyview('your_file.nc', dark_mode=True)
-
 # Custom dimension mapping
 viewer = pyview(file_path,
-                dark_mode=False,
                 dim_mapping={
                     'lat': 'yt_ocean',
                     'lon': 'xt_ocean',
